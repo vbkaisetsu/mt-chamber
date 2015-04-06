@@ -1,0 +1,58 @@
+# English Tokenizer
+Alias EnTokenizer System:showerr:command="/home/is/koichi-a/developments/travatar/git/travatar/src/bin/tokenizer"
+
+# Japanese Tokenizer
+Alias KyTea System:showerr:command="/home/is/neubig/work/kytea/src/bin/kytea \
+		-model /project/nakamura-lab01/Work/koichi-a/travatar-system/next/jp-0.4.7-1.mod -notags -wsconst D"
+
+# Syntactic Parsers
+Alias ParseEnglish System:showerr:command="/home/is/koichi-a/developments/Ckylark/master/src/bin/ckylark \
+		--model /home/is/koichi-a/developments/Ckylark/master/model/wsj \
+		--add-root-tag \
+		--force-generate \
+		--prune-threshold 1e-7"
+Alias ParseJapanese System:showerr:command="/home/is/koichi-a/developments/Ckylark/master/src/bin/ckylark \
+		--model /home/is/koichi-a/developments/Ckylark/master/model/jdc \
+		--add-root-tag \
+		--force-generate \
+		--prune-threshold 1e-7"
+
+# Load raw data
+Read:file="./en_raw" > en_raw
+Read:file="./ja_raw" > ja_raw
+
+# Pre cleaning（Remove e-mail address and xml tags）
+PreCleaner < en_raw ja_raw > en_preclean ja_preclean
+
+# Normalize Japanese
+JapaneseNormalizer < ja_preclean > ja_norm
+
+# Tokenize
+EnTokenizer < en_preclean > en_tok
+KyTea < ja_norm > ja_tok_pre
+
+# Remove unneeded spaces
+StripSpace < ja_tok_pre > ja_tok
+
+# Clean by word count
+LengthCleaner < en_tok ja_tok > en_clean ja_clean
+
+# To lower case
+LowerCaser < en_clean > en_clean_low
+LowerCaser < ja_clean > ja_clean_low
+
+# Write
+Write:file="./en.tok.clean.low" < en_clean_low
+Write:file="./ja.tok.clean.low" < ja_clean_low
+
+# Syntactic parse
+ParseEnglish < en_clean > en_tree
+ParseJapanese < ja_clean > ja_tree
+
+# To lower
+LowerCaser < en_tree > en_tree_low
+LowerCaser < ja_tree > ja_tree_low
+
+# Write
+Write:file="./en.tok.clean.tree.low" < en_tree_low
+Write:file="./ja.tok.clean.tree.low" < ja_tree_low
