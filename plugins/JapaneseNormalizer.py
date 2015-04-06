@@ -25,7 +25,7 @@ class KatakanaPSM:
 
 class Command:
 
-	KATAKANA_PSM_DB = os.path.join(os.dirname(__file__), "data/katakana_psm.db")
+	KATAKANA_PSM_DB = os.path.join(os.path.dirname(__file__), "data/katakana_psm.db")
 
 	InputSize = 1
 	OutputSize = 1
@@ -39,4 +39,4 @@ class Command:
 		normalline = unicodedata.normalize("NFKC", instream[0])
 		normalline = zenhan.h2z(" ".join(normalline.split()))
 		normalline = self.kpsm.addPSM(normalline)
-		return (normalline,)
+		return (normalline + "\n",)

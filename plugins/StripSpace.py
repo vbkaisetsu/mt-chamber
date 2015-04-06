@@ -12,5 +12,5 @@ class Command:
 		return
 
 	def routine(self, instream):
-		wordconcat = " ".join(tok.split())
+		wordconcat = " ".join(instream[0].split())
 		return (wordconcat + "\n",)
