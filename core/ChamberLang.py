@@ -124,7 +124,7 @@ class ScriptRunner:
 			return "\n"
 		return esc_ch
 
-	def __init__(self, lines, threads=1, queues=100):
+	def __init__(self, lines, threads=1, buffersize=100):
 		str_rep = {}
 		variables = {}
 		alias = {}
@@ -206,7 +206,7 @@ class ScriptRunner:
 				if outvar is not None:
 					outvar_name.extend(outvar.split())
 
-			proc = Processor(command, options, threads=self.threads, Qsize=queues)
+			proc = Processor(command, options, threads=self.threads, Qsize=buffersize)
 			if len(invar_name) != proc.klass.InputSize:
 				raise Exception("Input size mismatch (required %d, given %d) (line %d)" % (proc.klass.InputSize, len(invar_name), n+1))
 			if len(outvar_name) != proc.klass.OutputSize:
