@@ -31,7 +31,7 @@ class Processor:
 		except AttributeError:
 			raise Exception("Command \"%s\" is not found" % commandname)
 
-		self.command = [self.klass(**argdict) for i in range(threads if self.klass.ThreadIndependent else 1)]
+		self.command = [self.klass(**argdict) for i in range(1 if self.klass.ShareResources else threads)]
 		self.inputqueue = queue.Queue()
 		self.outputvariable = [DistributorVariable() for i in range(self.klass.OutputSize)]
 		self.lock = threading.Lock()
@@ -69,7 +69,7 @@ class Processor:
 
 	def run_routine(self, thread_id_orig):
 		thread_id = thread_id_orig
-		if not self.klass.ThreadIndependent:
+		if self.klass.ShareResources:
 			thread_id = 0
 		if self.klass.InputSize != 0:
 			order, instream = self.inputqueue.get()

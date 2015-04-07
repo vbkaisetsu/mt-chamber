@@ -5,7 +5,7 @@ class Command:
 	InputSize = 1
 	OutputSize = 0
 	MultiThreadable = False
-	ThreadIndependent = False
+	ShareResources = True
 
 	def __init__(self, file):
 		self.fp = open(file, "w")

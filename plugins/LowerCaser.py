@@ -3,7 +3,7 @@ class Command:
 	InputSize = 1
 	OutputSize = 1
 	MultiThreadable = True
-	ThreadIndependent = False
+	ShareResources = True
 
 	def __init__(self):
 		return

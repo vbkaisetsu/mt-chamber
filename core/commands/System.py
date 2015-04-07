@@ -6,7 +6,7 @@ class Command:
 	InputSize = 1
 	OutputSize = 1
 	MultiThreadable = True
-	ThreadIndependent = True
+	ShareResources = False
 
 	def __init__(self, command, showerr=False):
 		self.command = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=None if showerr else subprocess.PIPE, universal_newlines=True, shell=True)
