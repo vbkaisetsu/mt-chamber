@@ -14,5 +14,5 @@ class Command:
 		self.fp.write(instream[0])
 		return ()
 
-	def __exit__(self):
+	def __del__(self):
 		self.fp.close()
