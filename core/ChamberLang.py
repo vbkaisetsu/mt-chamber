@@ -206,7 +206,12 @@ class ScriptRunner:
 				if outvar is not None:
 					outvar_name.extend(outvar.split())
 
-			proc = Processor(command, options, threads=self.threads, Qsize=buffersize)
+			try:
+				proc = Processor(command, options, threads=self.threads, Qsize=buffersize)
+			except:
+				print("At line %d:" % (n+1))
+				raise
+
 			if len(invar_name) != proc.klass.InputSize:
 				raise Exception("Input size mismatch (required %d, given %d) (line %d)" % (proc.klass.InputSize, len(invar_name), n+1))
 			if len(outvar_name) != proc.klass.OutputSize:

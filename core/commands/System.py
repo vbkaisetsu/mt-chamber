@@ -1,5 +1,7 @@
 import subprocess
 
+import shlex
+
 
 class Command:
 
@@ -9,7 +11,7 @@ class Command:
 	ShareResources = False
 
 	def __init__(self, command, showerr=False):
-		self.command = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=None if showerr else subprocess.PIPE, universal_newlines=True, shell=True)
+		self.command = subprocess.Popen(shlex.split(command), stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=None if showerr else subprocess.PIPE, universal_newlines=True)
 
 	def routine(self, instream):
 		if instream[0] == "":
