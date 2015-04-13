@@ -83,7 +83,7 @@ class Processor:
 			self.oldest_order = min(self.working_list)
 		outstream = self.command[thread_id].routine(instream) if instream is not None else None
 		with self.lock:
-			self.working_list.remove(order)
+			self.working_list.discard(order)
 			self.oldest_order = min(self.working_list) if self.working_list else -2
 		with self.ackput_condition:
 			self.ackput_condition.notify_all()
