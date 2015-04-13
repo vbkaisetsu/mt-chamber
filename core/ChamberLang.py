@@ -1,7 +1,7 @@
 import re
-import hashlib
 import queue
 import threading
+import shlex
 from collections import defaultdict
 
 
@@ -107,15 +107,8 @@ class Processor:
 
 
 class ScriptRunner:
-	quot_matcher = re.compile("(\"(?:\\\\.|[^\\\"\\\\])*\"|'(?:\\\\.|[^\\\'\\\\])*')")
-	sym_matcher = re.compile("(<|>|=|:)")
 	availablename_matcher = re.compile("[A-Za-z_]\w*$")
-
 	esc_seq_matcher = re.compile(r"\\(.)")
-
-	option_complete_matcher = re.compile("( (: ([A-Za-z_]\w+)( = (\S+?))?|<( [A-Za-z_]\w+)+|>( [A-Za-z_]\w+)+))*$")
-	option_matcher = re.compile("(: (?P<optname>([A-Za-z_]\w+))( = (?P<optval>(\S+)))?|<(?P<input>( [A-Za-z_]\w+)+)|>(?P<output>( [A-Za-z_]\w+)+))")
-
 	intfloat_matcher = re.compile(r"[+\-]?(\d*\.?\d+|\d+\.?\d*)$")
 
 	def esc_replacer(m):
@@ -125,7 +118,6 @@ class ScriptRunner:
 		return esc_ch
 
 	def __init__(self, lines, threads=1, buffersize=100):
-		str_rep = {}
 		variables = {}
 		alias = {}
 		self.procs = []
@@ -134,82 +126,85 @@ class ScriptRunner:
 		for n, line in enumerate(lines):
 			line = line.strip()
 
+			# skip comment line
 			if not line or line[0] == "#":
 				continue
 
+			# Concatinate
 			line = prevline + line
 			if line[-1] == "\\":
 				prevline = line[:-1] + " "
 				continue
 			prevline = ""
-			if "$$" in line:
-				raise Exception("Script has a reserved sequence \"$$\"")
-			while True:
-				m = ScriptRunner.quot_matcher.search(line)
-				if not m:
-					break
-				orig_str = m.group(0)
-				hash_str = "$$STR_" + hashlib.sha224(orig_str.encode("utf-8")).hexdigest()
-				str_rep[hash_str] = orig_str
-				line = line.replace(orig_str, " " + hash_str + " ")
 
-			if "\"" in line:
-				raise Exception("Syntax wrong at line %d" % (n+1))
+			shline = shlex.shlex(line)
+			shline.whitespace_split = False
+			shline.escapedquotes = "\"'"
+			try:
+				tokens = list(shline)
+			except ValueError:
+				print("At line %d:" % (n+1), file=sys.stderr)
 
-			line = ScriptRunner.sym_matcher.sub(" \\1 ", line)
-
-			spl_line = line.split()
-			for i, w in enumerate(spl_line):
+			for i, w in enumerate(tokens):
 				if w in alias:
-					spl_line[i:i+1] = alias[w]
+					tokens[i:i+1] = alias[w]
 
-			command = spl_line[0]
+			command = tokens[0]
 
 			if command == "Alias":
-				if len(spl_line) < 3:
-					raise Exception("Syntax wrong at line %d" % (n+1))
-				if not ScriptRunner.availablename_matcher.match(spl_line[1]):
-					raise Exception("Unavailable characters are used for an alias name (line %d)" % (n+1))
-				alias[spl_line[1]] = spl_line[2:]
+				if len(tokens) < 3:
+					raise Exception("Syntax error at line %d" % (n+1))
+				if not ScriptRunner.availablename_matcher.match(tokens[1]):
+					raise Exception("Syntax error at line %d" % (n+1))
+				alias[tokens[1]] = tokens[2:]
 				continue
 
 			options = {}
 			invar_name = []
 			outvar_name = []
 
-			optionstrings = " " + " ".join(spl_line[1:])
-			m = ScriptRunner.option_complete_matcher.match(optionstrings)
-			if not m:
-				raise Exception("Syntax wrong at line %d" % (n+1))
-			opts = ScriptRunner.option_matcher.finditer(optionstrings)
-
-			for opt in opts:
-				optname = opt.groupdict()["optname"]
-				optval = opt.groupdict()["optval"]
-				invar = opt.groupdict()["input"]
-				outvar = opt.groupdict()["output"]
-				if optname is not None:
-					if optval is None:
+			opt_tokens = tokens[1:] + [""]
+			while True:
+				token = opt_tokens.pop(0)
+				if token == "<":
+					if not ScriptRunner.availablename_matcher.match(opt_tokens[0]):
+						raise Exception("Syntax error at line %d" % (n+1))
+					while ScriptRunner.availablename_matcher.match(opt_tokens[0]):
+						invar_name.append(opt_tokens.pop(0))
+				elif token == ">":
+					if not ScriptRunner.availablename_matcher.match(opt_tokens[0]):
+						raise Exception("Syntax error at line %d" % (n+1))
+					while ScriptRunner.availablename_matcher.match(opt_tokens[0]):
+						outvar_name.append(opt_tokens.pop(0))
+				elif token == ":":
+					if not ScriptRunner.availablename_matcher.match(opt_tokens[0]):
+						raise Exception("Syntax error at line %d" % (n+1))
+					optname = opt_tokens.pop(0)
+					if opt_tokens[0] == "=":
+						opt_tokens.pop(0)
+						optval = opt_tokens.pop(0)
+						if optval == "True":
+							options[optname] = True
+						elif optval == "False":
+							options[optname] = False
+						elif len(optval) >= 2 and (optval[0] == optval[-1] == "\"" or optval[0] == optval[-1] == "'"):
+							string = ScriptRunner.esc_seq_matcher.sub(ScriptRunner.esc_replacer, optval[1:-1])
+							options[optname] = string
+						elif ScriptRunner.intfloat_matcher.match(optval):
+							options[optname] = float(optval)
+						else:
+							raise Exception("Syntax error at line %d" % (n+1))
+					else:
 						options[optname] = True
-					elif optval == "True":
-						options[optname] = True
-					elif optval == "False":
-						options[optname] = False
-					elif optval.startswith("$$STR_"):
-						string = str_rep[optval][1:-1]
-						string = ScriptRunner.esc_seq_matcher.sub(ScriptRunner.esc_replacer, string)
-						options[optname] = string
-					elif ScriptRunner.intfloat_matcher.match(optval):
-						options[optname] = float(optval)
-				if invar is not None:
-					invar_name.extend(invar.split())
-				if outvar is not None:
-					outvar_name.extend(outvar.split())
+				elif token == "":
+					break
+				else:
+					raise Exception("Syntax error at line %d" % (n+1))
 
 			try:
 				proc = Processor(command, options, threads=self.threads, Qsize=buffersize)
 			except:
-				print("At line %d:" % (n+1))
+				print("At line %d:" % (n+1), file=sys.stderr)
 				raise
 
 			if len(invar_name) != proc.klass.InputSize:
