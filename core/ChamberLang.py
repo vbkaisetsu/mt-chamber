@@ -262,6 +262,7 @@ class ScriptRunner:
 				statement_line = "exit"
 
 			shline = shlex.shlex(statement_line, posix=True)
+			shline.whitespace_split = True
 			shline.escapedquotes = "\"'"
 			try:
 				statement = list(shline)
