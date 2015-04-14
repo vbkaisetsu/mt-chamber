@@ -287,4 +287,4 @@ class ScriptRunner:
 			for proc in self.procs:
 				if hasattr(proc.klass, "hook_prompt"):
 					for p in proc.command:
-						p.hook_prompt(prompt_lock, statement)
+						p.hook_prompt(statement, prompt_lock)

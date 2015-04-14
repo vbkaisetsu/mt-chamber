@@ -19,7 +19,7 @@ class Command:
 		self.data = instream
 		return ()
 
-	def hook_prompt(self, lock, statement):
+	def hook_prompt(self, statement, lock):
 		if statement[0] != "watch":
 			return
 		if len(statement) == 1 or self.name in statement[1:]:
