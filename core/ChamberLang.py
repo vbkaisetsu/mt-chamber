@@ -32,7 +32,7 @@ class DistributorVariable:
 
 
 class Processor:
-	def __init__(self, commandname, argdict, insize, outsize, threads=1, Qsize=100):
+	def __init__(self, commandname, argdict, insize, outsize, linenum, threads=1, Qsize=100):
 		try:
 			if hasattr(__import__("plugins", fromlist=[commandname]), commandname):
 				self.klass = getattr(__import__("plugins", fromlist=[commandname]), commandname).Command
@@ -42,6 +42,7 @@ class Processor:
 			raise Exception("Command \"%s\" is not found" % commandname)
 
 		self.command = [self.klass(**argdict) for i in range(1 if not self.klass.MultiThreadable or self.klass.ShareResources else threads)]
+		self.linenum = linenum
 		self.inputqueue = queue.Queue()
 		self.outputvariable = [DistributorVariable() for i in range(outsize)]
 		self.lock = threading.Lock()
@@ -96,7 +97,11 @@ class Processor:
 		with self.lock:
 			self.working_list.add(order)
 			self.oldest_order = min(self.working_list)
-		outstream = self.command[thread_id].routine(instream) if instream is not None else None
+		try:
+			outstream = self.command[thread_id].routine(instream) if instream is not None else None
+		except Exception:
+			print("In routine of line %d:" % self.linenum, file=sys.stderr)
+			raise
 		with self.lock:
 			self.working_list.discard(order)
 			self.oldest_order = min(self.working_list) if self.working_list else -2
@@ -218,7 +223,7 @@ class ScriptRunner:
 					raise Exception("Syntax error at line %d" % (n+1))
 
 			try:
-				proc = Processor(command, options, len(invar_name), len(outvar_name), threads=self.threads, Qsize=buffersize)
+				proc = Processor(command, options, len(invar_name), len(outvar_name), n+1, threads=self.threads, Qsize=buffersize)
 			except:
 				print("At line %d:" % (n+1), file=sys.stderr)
 				raise
