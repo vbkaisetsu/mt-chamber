@@ -1,17 +1,17 @@
 # English Tokenizer
-Alias EnTokenizer System:showerr:command="/home/is/koichi-a/developments/travatar/git/travatar/src/bin/tokenizer"
+Alias EnTokenizer System:command="/home/is/koichi-a/developments/travatar/git/travatar/src/bin/tokenizer"
 
 # Japanese Tokenizer
-Alias KyTea System:showerr:command="/home/is/neubig/work/kytea/src/bin/kytea \
+Alias KyTea System:command="/home/is/neubig/work/kytea/src/bin/kytea \
 		-model /project/nakamura-lab01/Work/koichi-a/travatar-system/next/jp-0.4.7-1.mod -notags -wsconst D"
 
 # Syntactic Parsers
-Alias ParseEnglish System:showerr:command="/home/is/koichi-a/developments/Ckylark/master/src/bin/ckylark \
+Alias ParseEnglish System:command="/home/is/koichi-a/developments/Ckylark/master/src/bin/ckylark \
 		--model /home/is/koichi-a/developments/Ckylark/master/model/wsj \
 		--add-root-tag \
 		--force-generate \
 		--prune-threshold 1e-7"
-Alias ParseJapanese System:showerr:command="/home/is/koichi-a/developments/Ckylark/master/src/bin/ckylark \
+Alias ParseJapanese System:command="/home/is/koichi-a/developments/Ckylark/master/src/bin/ckylark \
 		--model /home/is/koichi-a/developments/Ckylark/master/model/jdc \
 		--add-root-tag \
 		--force-generate \
