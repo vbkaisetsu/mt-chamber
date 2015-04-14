@@ -22,7 +22,7 @@ class DistributorVariable:
 
 
 class Processor:
-	def __init__(self, commandname, argdict, threads=1, Qsize=100):
+	def __init__(self, commandname, argdict, insize, outsize, threads=1, Qsize=100):
 		try:
 			if hasattr(__import__("plugins", fromlist=[commandname]), commandname):
 				self.klass = getattr(__import__("plugins", fromlist=[commandname]), commandname).Command
@@ -33,18 +33,19 @@ class Processor:
 
 		self.command = [self.klass(**argdict) for i in range(1 if self.klass.ShareResources else threads)]
 		self.inputqueue = queue.Queue()
-		self.outputvariable = [DistributorVariable() for i in range(self.klass.OutputSize)]
+		self.outputvariable = [DistributorVariable() for i in range(outsize)]
 		self.lock = threading.Lock()
 		self.ackput_condition = threading.Condition()
 		self.working_list = set()
 		self.oldest_order = -1
 		self.seqorder = 0
 		self.Qsize = Qsize
-		self.temp_input = defaultdict(lambda : [None] * self.klass.InputSize)
+		self.temp_input = defaultdict(lambda : [None] * insize)
 		self.stop_at = -1
 		self.process_cnt = 0
 		self.singlethread_order = 0
 		self.threads = threads
+		self.InputSize = insize
 
 	def put_stop_request(self, order):
 		self.stop_at = order
@@ -71,7 +72,7 @@ class Processor:
 		thread_id = thread_id_orig
 		if self.klass.ShareResources:
 			thread_id = 0
-		if self.klass.InputSize != 0:
+		if self.InputSize != 0:
 			order, instream = self.inputqueue.get()
 		else:
 			with self.lock:
@@ -202,15 +203,31 @@ class ScriptRunner:
 					raise Exception("Syntax error at line %d" % (n+1))
 
 			try:
-				proc = Processor(command, options, threads=self.threads, Qsize=buffersize)
+				proc = Processor(command, options, len(invar_name), len(outvar_name), threads=self.threads, Qsize=buffersize)
 			except:
 				print("At line %d:" % (n+1), file=sys.stderr)
 				raise
 
-			if len(invar_name) != proc.klass.InputSize:
-				raise Exception("Input size mismatch (required %d, given %d) (line %d)" % (proc.klass.InputSize, len(invar_name), n+1))
-			if len(outvar_name) != proc.klass.OutputSize:
-				raise Exception("Output size mismatch (required %d, given %d) (line %d)" % (proc.klass.OutputSize, len(outvar_name), n+1))
+			if callable(proc.klass.InputSize):
+				try:
+					proc.command[0].InputSize(len(invar_name))
+				except:
+					print("At line %d:" % (n+1), file=sys.stderr)
+					raise
+			elif len(invar_name) != proc.klass.InputSize:
+				print("At line %d:" % (n+1), file=sys.stderr)
+				raise Exception("Input size mismatch (required %d, given %d)" % (proc.klass.InputSize, len(invar_name)))
+
+			if callable(proc.klass.OutputSize):
+				try:
+					proc.command[0].OutputSize(len(outvar_name))
+				except:
+					print("At line %d:" % (n+1), file=sys.stderr)
+					raise
+			elif len(outvar_name) != proc.klass.OutputSize:
+				print("At line %d:" % (n+1), file=sys.stderr)
+				raise Exception("Output size mismatch (required %d, given %d)" % (proc.klass.OutputSize, len(outvar_name)))
+
 			for i, varname in enumerate(invar_name):
 				if varname not in variables:
 					raise Exception("Variable \"%s\" is not defined (line %d)" % (varname, n+1))
