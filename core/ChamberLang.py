@@ -4,6 +4,7 @@ import threading
 import shlex
 import sys
 import readline
+import errno
 from collections import defaultdict
 
 
@@ -84,14 +85,9 @@ class Processor:
 		if not self.klass.MultiThreadable or self.klass.ShareResources:
 			thread_id = 0
 		if self.InputSize != 0:
-			while True:
-				try:
-					order, instream = self.inputqueue.get(timeout=1)
-					break
-				except queue.Empty:
-					if self.killing.is_set():
-						raise Killed("killing is set")
-
+			order, instream = self.inputqueue.get()
+			if self.killing.is_set():
+				raise Killed("killing is set")
 		else:
 			with self.lock:
 				order = self.seqorder
@@ -142,6 +138,7 @@ class ScriptRunner:
 		self.procs = []
 		prevline = ""
 		self.threads = threads
+
 		for n, line in enumerate(lines):
 			line = line.strip()
 
@@ -256,9 +253,10 @@ class ScriptRunner:
 			self.procs.append(proc)
 
 	def killprocs(self):
-		print("Killing processes...")
 		for p in self.procs:
 			p.killing.set()
+			for i in range(p.threads):
+				p.inputqueue.put((0, None))
 			with p.ackput_condition:
 				p.ackput_condition.notify_all()
 
@@ -271,6 +269,13 @@ class ScriptRunner:
 						return
 			except Killed:
 				return
+			except Exception as e:
+				if e.errno == errno.EPIPE:
+					print("System command has been died")
+					self.killprocs()
+				else:
+					self.killprocs()
+					raise
 
 		ts = []
 		for proc in self.procs:
@@ -313,6 +318,7 @@ class ScriptRunner:
 						break
 
 				if statement[0] == "kill":
+					print("Killing processes...")
 					self.killprocs()
 					break
 
@@ -322,6 +328,7 @@ class ScriptRunner:
 							cmd.hook_prompt(statement, prompt_lock)
 
 			except KeyboardInterrupt:
+				print("Killing processes...")
 				self.killprocs()
 				break
 
