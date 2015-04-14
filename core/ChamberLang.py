@@ -266,7 +266,7 @@ class ScriptRunner:
 	def run(self, prompt=False):
 		def subWorker(proc, thread_id):
 			try:
-				while True:
+				while not proc.killing.is_set():
 					ret = proc.run_routine(thread_id)
 					if not ret:
 						return
