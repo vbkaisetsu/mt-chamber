@@ -40,7 +40,7 @@ class Processor:
 		except AttributeError:
 			raise Exception("Command \"%s\" is not found" % commandname)
 
-		self.command = [self.klass(**argdict) for i in range(1 if self.klass.ShareResources else threads)]
+		self.command = [self.klass(**argdict) for i in range(1 if not self.klass.MultiThreadable or self.klass.ShareResources else threads)]
 		self.inputqueue = queue.Queue()
 		self.outputvariable = [DistributorVariable() for i in range(outsize)]
 		self.lock = threading.Lock()
@@ -68,8 +68,7 @@ class Processor:
 				self.ackput_condition.wait()
 		if self.killing.is_set():
 			raise Killed("killing is set")
-		with self.lock:
-			self.temp_input[order][i] = data
+		self.temp_input[order][i] = data
 		if self.klass.MultiThreadable:
 			if None not in self.temp_input[order]:
 				self.inputqueue.put((order, self.temp_input.pop(order)))
@@ -82,7 +81,7 @@ class Processor:
 
 	def run_routine(self, thread_id_orig):
 		thread_id = thread_id_orig
-		if self.klass.ShareResources:
+		if not self.klass.MultiThreadable or self.klass.ShareResources:
 			thread_id = 0
 		if self.InputSize != 0:
 			while True:
