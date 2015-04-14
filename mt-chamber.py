@@ -9,19 +9,21 @@ def main():
 	parser = ArgumentParser()
 	parser.add_argument("-t", "--threads", type=int, default=1, help="number of threads (default: 1)")
 	parser.add_argument("-b", "--buffersize", type=int, default=100, help="size of buffer (default: 100)")
+	parser.add_argument("-p", "--prompt", action="store_true", help="run with prompt")
 	parser.add_argument("FILE", nargs="?", default=None, help="Chamber script file (default: stdin)")
 	args = parser.parse_args()
 
 	if args.threads < 1:
-		print("--threads must be larger than 1", file=sys.stderr)
-		return
+		parser.error("--threads must be larger than 1")
 
 	if args.buffersize <= args.threads:
-		print("--buffersize must be larger than --threads", file=sys.stderr)
-		return
+		parser.error("--buffersize must be larger than --threads")
 
 	if args.FILE is None:
-		fstream = sys.stdin
+		if not args.prompt:
+			fstream = sys.stdin
+		else:
+			parser.error("the following arguments are required in prompt mode: FILE")
 	else:
 		try:
 			fstream = open(args.FILE, "r")
@@ -30,7 +32,7 @@ def main():
 			return
 
 	script = ScriptRunner(fstream, threads=args.threads, buffersize=args.buffersize)
-	script.run()
+	script.run(prompt=args.prompt)
 
 	if fstream:
 		fstream.close()

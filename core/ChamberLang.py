@@ -2,6 +2,8 @@ import re
 import queue
 import threading
 import shlex
+import sys
+import readline
 from collections import defaultdict
 
 
@@ -237,7 +239,7 @@ class ScriptRunner:
 
 			self.procs.append(proc)
 
-	def run(self):
+	def run(self, prompt=False):
 		def subWorker(proc, thread_id):
 			while True:
 				ret = proc.run_routine(thread_id)
@@ -250,5 +252,38 @@ class ScriptRunner:
 				t = threading.Thread(target=subWorker, args=(proc, i))
 				t.start()
 				ts.append(t)
-		for t in ts:
-			t.join()
+
+		prompt_lock = threading.Lock()
+		while True:
+			try:
+				statement_line = input(">>> ")
+			except EOFError:
+				print()
+				statement_line = "exit"
+
+			shline = shlex.shlex(statement_line, posix=True)
+			shline.escapedquotes = "\"'"
+			try:
+				statement = list(shline)
+			except ValueError as e:
+				print(e.value, sys.stderr)
+				continue
+
+			if statement[0] == "exit":
+				working = False
+				for t in ts:
+					if t.is_alive():
+						print("Some processes are working")
+						working = True
+						break
+				if working:
+					continue
+				else:
+					for t in ts:
+						t.join()
+					return
+
+			for proc in self.procs:
+				if hasattr(proc.klass, "hook_prompt"):
+					for p in proc.command:
+						p.hook_prompt(prompt_lock, statement)
