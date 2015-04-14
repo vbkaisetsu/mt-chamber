@@ -7,6 +7,13 @@ import readline
 from collections import defaultdict
 
 
+class Killed(Exception):
+	def __init__(self, value):
+		self.value = value
+	def __str__(self):
+		return repr(self.value)
+
+
 class DistributorVariable:
 	def __init__(self):
 		self.target = set()
@@ -48,6 +55,7 @@ class Processor:
 		self.singlethread_order = 0
 		self.threads = threads
 		self.InputSize = insize
+		self.killing = threading.Event()
 
 	def put_stop_request(self, order):
 		self.stop_at = order
@@ -56,8 +64,10 @@ class Processor:
 
 	def put_data(self, i, data, order):
 		with self.ackput_condition:
-			while self.oldest_order != -2 and order > self.oldest_order + self.Qsize:
+			while self.oldest_order != -2 and order > self.oldest_order + self.Qsize and not self.killing.is_set():
 				self.ackput_condition.wait()
+		if self.killing.is_set():
+			raise Killed("killing is set")
 		with self.lock:
 			self.temp_input[order][i] = data
 		if self.klass.MultiThreadable:
@@ -75,7 +85,14 @@ class Processor:
 		if self.klass.ShareResources:
 			thread_id = 0
 		if self.InputSize != 0:
-			order, instream = self.inputqueue.get()
+			while True:
+				try:
+					order, instream = self.inputqueue.get(timeout=1)
+					break
+				except queue.Empty:
+					if self.killing.is_set():
+						raise Killed("killing is set")
+
 		else:
 			with self.lock:
 				order = self.seqorder
@@ -239,12 +256,22 @@ class ScriptRunner:
 
 			self.procs.append(proc)
 
+	def killprocs(self):
+		print("Killing processes...")
+		for p in self.procs:
+			p.killing.set()
+			with p.ackput_condition:
+				p.ackput_condition.notify_all()
+
 	def run(self, prompt=False):
 		def subWorker(proc, thread_id):
-			while True:
-				ret = proc.run_routine(thread_id)
-				if not ret:
-					return
+			try:
+				while True:
+					ret = proc.run_routine(thread_id)
+					if not ret:
+						return
+			except Killed:
+				return
 
 		ts = []
 		for proc in self.procs:
@@ -256,35 +283,48 @@ class ScriptRunner:
 		prompt_lock = threading.Lock()
 		while True:
 			try:
-				statement_line = input(">>> ")
-			except EOFError:
-				print()
-				statement_line = "exit"
+				try:
+					statement_line = input(">>> ")
+				except EOFError:
+					print()
+					statement_line = "exit"
 
-			shline = shlex.shlex(statement_line, posix=True)
-			shline.whitespace_split = True
-			shline.escapedquotes = "\"'"
-			try:
-				statement = list(shline)
-			except ValueError as e:
-				print(e.value, sys.stderr)
-				continue
-
-			if statement[0] == "exit":
-				working = False
-				for t in ts:
-					if t.is_alive():
-						print("Some processes are working")
-						working = True
-						break
-				if working:
+				shline = shlex.shlex(statement_line, posix=True)
+				shline.whitespace_split = True
+				shline.escapedquotes = "\"'"
+				try:
+					statement = list(shline)
+				except ValueError as e:
+					print(e.value, sys.stderr)
 					continue
-				else:
-					for t in ts:
-						t.join()
-					return
 
-			for proc in self.procs:
-				if hasattr(proc.klass, "hook_prompt"):
-					for p in proc.command:
-						p.hook_prompt(statement, prompt_lock)
+				if not statement:
+					continue
+
+				if statement[0] == "exit":
+					working = False
+					for t in ts:
+						if t.is_alive():
+							print("Some processes are working")
+							working = True
+							break
+					if working:
+						continue
+					else:
+						break
+
+				if statement[0] == "kill":
+					self.killprocs()
+					break
+
+				for proc in self.procs:
+					if hasattr(proc.klass, "hook_prompt"):
+						for cmd in proc.command:
+							cmd.hook_prompt(statement, prompt_lock)
+
+			except KeyboardInterrupt:
+				self.killprocs()
+				break
+
+		for t in ts:
+			t.join()
