@@ -2,7 +2,7 @@
 
 import sys
 
-from core.ChamberLang import ScriptRunner
+from core.ChamberLang import ScriptRunner, ChamberInitialError
 from argparse import ArgumentParser
 
 def main():
@@ -31,7 +31,13 @@ def main():
 			print("Error: could not open `%s'" % args.FILE, file=sys.stderr)
 			return
 
-	script = ScriptRunner(fstream, threads=args.threads, buffersize=args.buffersize)
+	try:
+		script = ScriptRunner(fstream, threads=args.threads, buffersize=args.buffersize)
+	except ChamberInitialError as e:
+		print("At line %d: %s" % (e.linenumber, str(e.value)), file=sys.stderr)
+		if e.trace:
+			print(e.trace, file=sys.stderr)
+		return
 	script.run(prompt=args.prompt)
 
 	if fstream:

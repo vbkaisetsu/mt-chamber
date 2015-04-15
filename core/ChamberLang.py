@@ -6,11 +6,26 @@ import sys
 import readline
 import errno
 from collections import defaultdict
+import traceback
 
 
 class Killed(Exception):
-	def __init__(self, value):
+	pass
+
+
+class ChamberInitialError(Exception):
+	def __init__(self, value, linenumber, trace=None):
 		self.value = value
+		self.linenumber = linenumber
+		self.trace = trace
+	def __str__(self):
+		return repr(self.value)
+
+
+class ChamberRuntimeError(Exception):
+	def __init__(self, value, trace):
+		self.value = value
+		self.trace = trace
 	def __str__(self):
 		return repr(self.value)
 
@@ -32,7 +47,7 @@ class DistributorVariable:
 
 
 class Processor:
-	def __init__(self, commandname, argdict, insize, outsize, linenum, threads=1, Qsize=100):
+	def __init__(self, commandname, argdict, insize, outsize, threads=1, Qsize=100):
 		try:
 			if hasattr(__import__("plugins", fromlist=[commandname]), commandname):
 				self.klass = getattr(__import__("plugins", fromlist=[commandname]), commandname).Command
@@ -42,7 +57,6 @@ class Processor:
 			raise Exception("Command \"%s\" is not found" % commandname)
 
 		self.command = [self.klass(**argdict) for i in range(1 if not self.klass.MultiThreadable or self.klass.ShareResources else threads)]
-		self.linenum = linenum
 		self.inputqueue = queue.Queue()
 		self.outputvariable = [DistributorVariable() for i in range(outsize)]
 		self.lock = threading.Lock()
@@ -99,9 +113,9 @@ class Processor:
 			self.oldest_order = min(self.working_list)
 		try:
 			outstream = self.command[thread_id].routine(instream) if instream is not None else None
-		except Exception:
-			print("In routine of line %d:" % self.linenum, file=sys.stderr)
-			raise
+		except Exception as e:
+			tr = traceback.format_exc()
+			raise ChamberRuntimeError("Runtime error", tr)
 		with self.lock:
 			self.working_list.discard(order)
 			self.oldest_order = min(self.working_list) if self.working_list else -2
@@ -165,8 +179,8 @@ class ScriptRunner:
 			shline.escapedquotes = "\"'"
 			try:
 				tokens = list(shline)
-			except ValueError:
-				print("At line %d:" % (n+1), file=sys.stderr)
+			except ValueError as e:
+				raise ChamberInitialError(e, n+1)
 
 			for i, w in enumerate(tokens):
 				if w in alias:
@@ -176,9 +190,9 @@ class ScriptRunner:
 
 			if command == "Alias":
 				if len(tokens) < 3:
-					raise Exception("Syntax error at line %d" % (n+1))
+					raise ChamberInitialError("Syntax error", n+1)
 				if not ScriptRunner.availablename_matcher.match(tokens[1]):
-					raise Exception("Syntax error at line %d" % (n+1))
+					raise ChamberInitialError("Syntax error", n+1)
 				alias[tokens[1]] = tokens[2:]
 				continue
 
@@ -191,17 +205,17 @@ class ScriptRunner:
 				token = opt_tokens.pop(0)
 				if token == "<":
 					if not ScriptRunner.availablename_matcher.match(opt_tokens[0]):
-						raise Exception("Syntax error at line %d" % (n+1))
+						raise ChamberInitialError("Syntax error", n+1)
 					while ScriptRunner.availablename_matcher.match(opt_tokens[0]):
 						invar_name.append(opt_tokens.pop(0))
 				elif token == ">":
 					if not ScriptRunner.availablename_matcher.match(opt_tokens[0]):
-						raise Exception("Syntax error at line %d" % (n+1))
+						raise ChamberInitialError("Syntax error", n+1)
 					while ScriptRunner.availablename_matcher.match(opt_tokens[0]):
 						outvar_name.append(opt_tokens.pop(0))
 				elif token == ":":
 					if not ScriptRunner.availablename_matcher.match(opt_tokens[0]):
-						raise Exception("Syntax error at line %d" % (n+1))
+						raise ChamberInitialError("Syntax error", n+1)
 					optname = opt_tokens.pop(0)
 					if opt_tokens[0] == "=":
 						opt_tokens.pop(0)
@@ -216,51 +230,49 @@ class ScriptRunner:
 						elif ScriptRunner.intfloat_matcher.match(optval):
 							options[optname] = float(optval)
 						else:
-							raise Exception("Syntax error at line %d" % (n+1))
+							raise ChamberInitialError("Syntax error", n+1)
 					else:
 						options[optname] = True
 				elif token == "":
 					break
 				else:
-					raise Exception("Syntax error at line %d" % (n+1))
+					raise ChamberInitialError("Syntax error", n+1)
 
 			try:
-				proc = Processor(command, options, len(invar_name), len(outvar_name), n+1, threads=self.threads, Qsize=buffersize)
-			except:
-				print("At line %d:" % (n+1), file=sys.stderr)
-				raise
+				proc = Processor(command, options, len(invar_name), len(outvar_name), threads=self.threads, Qsize=buffersize)
+			except Exception as e:
+				tr = traceback.format_exc()
+				raise ChamberInitialError(e, n+1, tr)
 
 			if callable(proc.klass.InputSize):
 				try:
 					proc.command[0].InputSize(len(invar_name))
-				except:
-					print("At line %d:" % (n+1), file=sys.stderr)
-					raise
+				except Exception as e:
+					tr = traceback.format_exc()
+					raise ChamberInitialError(e, n+1, tr)
 			elif len(invar_name) != proc.klass.InputSize:
-				print("At line %d:" % (n+1), file=sys.stderr)
-				raise Exception("Input size mismatch (required %d, given %d)" % (proc.klass.InputSize, len(invar_name)))
+				raise ChamberInitialError("Input size mismatch (required %d, given %d)" % (proc.klass.InputSize, len(invar_name)), n+1)
 
 			if callable(proc.klass.OutputSize):
 				try:
 					proc.command[0].OutputSize(len(outvar_name))
 				except:
-					print("At line %d:" % (n+1), file=sys.stderr)
-					raise
+					tr = traceback.format_exc()
+					raise ChamberInitialError(e, n+1, tr)
 			elif len(outvar_name) != proc.klass.OutputSize:
-				print("At line %d:" % (n+1), file=sys.stderr)
-				raise Exception("Output size mismatch (required %d, given %d)" % (proc.klass.OutputSize, len(outvar_name)))
+				raise ChamberInitialError("Output size mismatch (required %d, given %d)" % (proc.klass.OutputSize, len(outvar_name)), n+1)
 
 			for i, varname in enumerate(invar_name):
 				if varname not in variables:
-					raise Exception("Variable \"%s\" is not defined (line %d)" % (varname, n+1))
+					raise ChamberInitialError("Variable \"%s\" is not defined" % (varname), n+1)
 				variables[varname].add_target(proc, i)
 			for i, varname in enumerate(outvar_name):
 				variables[varname] = proc.outputvariable[i]
 
-			self.procs.append(proc)
+			self.procs.append((n+1, proc))
 
 	def killprocs(self):
-		for p in self.procs:
+		for lnum, p in self.procs:
 			p.killing = True
 			for i in range(p.threads):
 				p.inputqueue.put((0, None))
@@ -268,7 +280,9 @@ class ScriptRunner:
 				p.ackput_condition.notify_all()
 
 	def run(self, prompt=False):
-		def subWorker(proc, thread_id):
+		prompt_lock = threading.Lock()
+
+		def subWorker(proc, thread_id, lnum):
 			try:
 				while not proc.killing:
 					ret = proc.run_routine(thread_id)
@@ -277,23 +291,22 @@ class ScriptRunner:
 					self.running.wait()
 			except Killed:
 				return
-			except Exception as e:
-				if e.errno == errno.EPIPE:
-					print("System command has been died")
-					self.killprocs()
-				else:
-					self.killprocs()
-					raise
+			except ChamberRuntimeError as e:
+				self.killprocs()
+				with prompt_lock:
+					print("Runtime error at line %d:" % lnum, file=sys.stderr)
+					if hasattr(e.value, "errno") and e.value.errno == errno.EPIPE:
+						print("System command has been died", file=sys.stderr)
+					print(e.trace, file=sys.stderr)
 
 		ts = []
-		for proc in self.procs:
+		for lnum, proc in self.procs:
 			for i in range(self.threads if proc.klass.MultiThreadable else 1):
-				t = threading.Thread(target=subWorker, args=(proc, i))
+				t = threading.Thread(target=subWorker, args=(proc, i, lnum))
 				t.start()
 				ts.append(t)
 
 		if prompt:
-			prompt_lock = threading.Lock()
 			while True:
 				try:
 					try:
@@ -308,7 +321,7 @@ class ScriptRunner:
 					try:
 						statement = list(shline)
 					except ValueError as e:
-						print(e.value, sys.stderr)
+						print(e.value, file=sys.stderr)
 						continue
 
 					if not statement:
@@ -346,7 +359,7 @@ class ScriptRunner:
 						self.killprocs()
 						break
 
-					for proc in self.procs:
+					for lnum, proc in self.procs:
 						if hasattr(proc.klass, "hook_prompt"):
 							for cmd in proc.command:
 								cmd.hook_prompt(statement, prompt_lock)
