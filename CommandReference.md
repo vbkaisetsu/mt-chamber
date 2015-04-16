@@ -119,6 +119,14 @@ BSDソケット
   |          |2          |送信するデータ。                         |
   |出力      |1          |ソケットオブジェクト。                   |
 
+使用例:
+
+    ListeningSocket:ipaddr="localhost":port=1234:backlog=5 > conn
+    SocketReceiveData:size=65536:decode="utf-8" < conn > conn data
+    MyCommand < data > result
+    SocketSendData:encode="utf-8" < conn result > conn
+    CloseSocketConnection < conn
+
 
 デバッグ
 -------------------------------------------------------
@@ -139,3 +147,10 @@ BSDソケット
   |          |``tags``   |各入力に与える名前を``;``で区切って指定します。|
   |入力      |1 ...      |書き出す変数を1つ以上指定します。        |
   |出力      |なし       |                                         |
+
+使用例:
+
+    MyCommand < data > result
+    Seq < data > counter
+    Watch:name="new_watch" < counter data result
+    Log:file="log.txt":tags="Data;Result" < data result
