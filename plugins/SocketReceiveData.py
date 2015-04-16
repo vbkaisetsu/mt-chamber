@@ -5,13 +5,13 @@ class Command:
 	MultiThreadable = True
 	ShareResources = True
 
-	def __init__(self, length=1024, decode=None):
-		self.length = int(length)
+	def __init__(self, size=1024, decode=None):
+		self.size = int(size)
 		self.decode = decode
 
 	def routine(self, instream):
 		conn = instream[0]
-		data = conn.recv(self.length)
+		data = conn.recv(self.size)
 		if self.decode:
 			data = data.decode(self.decode)
 		return (conn, data)
