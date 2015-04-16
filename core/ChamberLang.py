@@ -199,6 +199,7 @@ class ScriptRunner:
 			options = {}
 			invar_name = []
 			outvar_name = []
+			commandthreads = -1
 
 			opt_tokens = tokens[1:] + [""]
 			while True:
@@ -233,13 +234,19 @@ class ScriptRunner:
 							raise ChamberInitialError("Syntax error", n+1)
 					else:
 						options[optname] = True
+				elif token == "*":
+					if not opt_tokens[0].isdigit() or commandthreads != -1:
+						raise ChamberInitialError("Syntax error", n+1)
+					commandthreads = int(opt_tokens.pop(0))
 				elif token == "":
 					break
 				else:
 					raise ChamberInitialError("Syntax error", n+1)
 
+			if commandthreads == -1:
+				commandthreads = self.threads
 			try:
-				proc = Processor(command, options, len(invar_name), len(outvar_name), threads=self.threads, Qsize=buffersize)
+				proc = Processor(command, options, len(invar_name), len(outvar_name), threads=commandthreads, Qsize=buffersize)
 			except Exception as e:
 				tr = traceback.format_exc()
 				raise ChamberInitialError(e, n+1, tr)
@@ -270,10 +277,10 @@ class ScriptRunner:
 			for i, varname in enumerate(outvar_name):
 				variables[varname] = proc.outputvariable[i]
 
-			self.procs.append((n+1, proc))
+			self.procs.append((n+1, proc, commandthreads))
 
 	def killprocs(self):
-		for lnum, p in self.procs:
+		for lnum, p, threads in self.procs:
 			p.killing = True
 			for i in range(p.threads):
 				p.inputqueue.put((0, None))
@@ -301,8 +308,10 @@ class ScriptRunner:
 					print(e.trace, file=sys.stderr)
 
 		ts = []
-		for lnum, proc in self.procs:
-			for i in range(self.threads if proc.klass.MultiThreadable else 1):
+		for lnum, proc, threads in self.procs:
+			if threads == -1:
+				threads = self.threads
+			for i in range(threads if proc.klass.MultiThreadable else 1):
 				t = threading.Thread(target=subWorker, args=(proc, i, lnum))
 				t.start()
 				ts.append(t)
@@ -360,7 +369,7 @@ class ScriptRunner:
 						self.killprocs()
 						break
 
-					for lnum, proc in self.procs:
+					for lnum, proc, threads in self.procs:
 						if hasattr(proc.klass, "hook_prompt"):
 							for cmd in proc.command:
 								cmd.hook_prompt(statement, prompt_lock)
