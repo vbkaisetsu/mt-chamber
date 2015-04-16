@@ -71,6 +71,7 @@ class Processor:
 		self.singlethread_order = 0
 		self.threads = threads
 		self.InputSize = insize
+		self.OutputSize = outsize
 		self.killing = False
 
 	def put_stop_request(self, order):
@@ -122,6 +123,8 @@ class Processor:
 		with self.ackput_condition:
 			self.ackput_condition.notify_all()
 		if outstream is not None:
+			if len(outstream) != self.OutputSize:
+				raise ChamberRuntimeError("Returned tuple size mismatch (required %d, returned %d)" % (self.OutputSize, len(outstream)), "")
 			for i, v in enumerate(outstream):
 				self.outputvariable[i].push(v, order)
 		self.lock.acquire()
