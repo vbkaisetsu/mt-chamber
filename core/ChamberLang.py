@@ -283,12 +283,15 @@ class ScriptRunner:
 			self.procs.append((n+1, proc, commandthreads))
 
 	def killprocs(self):
-		for lnum, p, threads in self.procs:
-			p.killing = True
-			for i in range(p.threads):
-				p.inputqueue.put((0, None))
-			with p.ackput_condition:
-				p.ackput_condition.notify_all()
+		for lnum, proc, threads in self.procs:
+			proc.killing = True
+			if hasattr(proc.klass, "kill"):
+				for c in proc.command:
+					c.kill()
+			for i in range(proc.threads):
+				proc.inputqueue.put((0, None))
+			with proc.ackput_condition:
+				proc.ackput_condition.notify_all()
 
 	def run(self, prompt=False):
 		prompt_lock = threading.Lock()

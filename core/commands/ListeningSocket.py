@@ -11,7 +11,19 @@ class Command:
 		self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 		self.socket.bind((ipaddr, int(port)))
 		self.socket.listen(backlog)
+		self.socket.settimeout(0.5)
+		self.stop_request = False
 
 	def routine(self, instream):
-		conn, addr = self.socket.accept()
-		return (conn,)
+		while True:
+			if not self.stop_request:
+				try:
+					conn, addr = self.socket.accept()
+					return (conn,)
+				except socket.timeout:
+					pass
+			else:
+				return None
+
+	def kill(self):
+		self.stop_request = True
