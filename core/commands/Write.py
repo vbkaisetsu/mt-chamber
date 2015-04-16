@@ -7,8 +7,8 @@ class Command:
 	MultiThreadable = False
 	ShareResources = True
 
-	def __init__(self, file):
-		self.fp = open(file, "w")
+	def __init__(self, file, buff=-1):
+		self.fp = open(file, "w", buffering=buff)
 
 	def routine(self, instream):
 		self.fp.write(instream[0])
