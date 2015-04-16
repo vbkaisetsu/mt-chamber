@@ -266,6 +266,7 @@ class ScriptRunner:
 				if varname not in variables:
 					raise ChamberInitialError("Variable \"%s\" is not defined" % (varname), n+1)
 				variables[varname].add_target(proc, i)
+
 			for i, varname in enumerate(outvar_name):
 				variables[varname] = proc.outputvariable[i]
 

@@ -13,5 +13,5 @@ class Command:
 		data = instream[1]
 		if self.encode:
 			data = data.encode(self.encode)
-		conn.send(data)
+		conn.sendall(data)
 		return (conn,)
