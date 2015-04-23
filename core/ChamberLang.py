@@ -47,7 +47,7 @@ class DistributorVariable:
 
 
 class Processor:
-	def __init__(self, commandname, argdict, insize, outsize, threads=1, Qsize=100):
+	def __init__(self, commandname, argdict, insize, outsize, threads=1, unsrt_limit=100):
 		try:
 			if hasattr(__import__("plugins", fromlist=[commandname]), commandname):
 				self.klass = getattr(__import__("plugins", fromlist=[commandname]), commandname).Command
@@ -61,11 +61,11 @@ class Processor:
 		self.outputvariable = [DistributorVariable() for i in range(outsize)]
 		self.lock = threading.Lock()
 		self.ackput_condition = threading.Condition()
-		self.working_list = set()
-		self.oldest_order = -1
 		self.seqorder = 0
-		self.Qsize = Qsize
+		self.unsrt_limit = unsrt_limit
 		self.temp_input = defaultdict(lambda : [None] * insize)
+		self.unsrt_memory = [False] * (self.unsrt_limit + 1)
+		self.unsrt_top = 0
 		self.stop_at = -1
 		self.process_cnt = 0
 		self.singlethread_order = 0
@@ -81,7 +81,7 @@ class Processor:
 
 	def put_data(self, i, data, order):
 		with self.ackput_condition:
-			while self.oldest_order != -2 and order > self.oldest_order + self.Qsize and not self.killing:
+			while order >= self.unsrt_top + self.unsrt_limit and not self.killing:
 				self.ackput_condition.wait()
 		if self.killing:
 			raise Killed("killing is set")
@@ -109,19 +109,23 @@ class Processor:
 				order = self.seqorder
 				self.seqorder += 1
 			instream = ()
-		with self.lock:
-			self.working_list.add(order)
-			self.oldest_order = min(self.working_list)
 		try:
 			outstream = self.command[thread_id].routine(instream) if instream is not None else None
 		except Exception as e:
 			tr = traceback.format_exc()
 			raise ChamberRuntimeError("Runtime error", tr)
-		with self.lock:
-			self.working_list.discard(order)
-			self.oldest_order = min(self.working_list) if self.working_list else -2
-		with self.ackput_condition:
-			self.ackput_condition.notify_all()
+		if self.InputSize != 0:
+			with self.ackput_condition:
+				self.unsrt_memory[order - self.unsrt_top] = True
+				if False not in self.unsrt_memory:
+					unsrt_mem_shiftsize = self.unsrt_limit
+				else:
+					unsrt_mem_shiftsize = self.unsrt_memory.index(False)
+				if unsrt_mem_shiftsize != 0:
+					self.unsrt_memory[:unsrt_mem_shiftsize] = []
+					self.unsrt_memory.extend([False] * unsrt_mem_shiftsize)
+					self.unsrt_top += unsrt_mem_shiftsize
+				self.ackput_condition.notify_all()
 		if outstream is not None:
 			if len(outstream) != self.OutputSize:
 				raise ChamberRuntimeError("Returned tuple size mismatch (required %d, returned %d)" % (self.OutputSize, len(outstream)), "")
@@ -154,7 +158,7 @@ class ScriptRunner:
 			return "\n"
 		return esc_ch
 
-	def __init__(self, lines, threads=1, buffersize=100):
+	def __init__(self, lines, threads=1, unsrt_limit=100):
 		variables = {}
 		alias = {}
 		self.procs = []
@@ -249,7 +253,7 @@ class ScriptRunner:
 			if commandthreads == -1:
 				commandthreads = self.threads
 			try:
-				proc = Processor(command, options, len(invar_name), len(outvar_name), threads=commandthreads, Qsize=buffersize)
+				proc = Processor(command, options, len(invar_name), len(outvar_name), threads=commandthreads, unsrt_limit=unsrt_limit)
 			except Exception as e:
 				tr = traceback.format_exc()
 				raise ChamberInitialError(e, n+1, tr)
