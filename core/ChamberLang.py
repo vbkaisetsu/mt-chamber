@@ -43,7 +43,9 @@ class DistributorVariable:
 
 	def push(self, data, order):
 		for proc, i in self.target:
-			proc.put_data(i, data, order)
+			if not proc.put_data(i, data, order):
+				return False
+		return True
 
 
 class Processor:
@@ -73,6 +75,7 @@ class Processor:
 		self.InputSize = insize
 		self.OutputSize = outsize
 		self.killing = False
+		self.done = False
 
 	def put_stop_request(self, order):
 		self.stop_at = order
@@ -83,6 +86,8 @@ class Processor:
 		with self.ackput_condition:
 			while order >= self.unsrt_top + self.unsrt_limit and not self.killing:
 				self.ackput_condition.wait()
+		if self.done:
+			return False
 		if self.killing:
 			raise Killed("killing is set")
 		self.temp_input[order][i] = data
@@ -95,6 +100,7 @@ class Processor:
 					break
 				self.inputqueue.put((self.singlethread_order, self.temp_input.pop(self.singlethread_order)))
 				self.singlethread_order += 1
+		return True
 
 	def run_routine(self, thread_id_orig):
 		thread_id = thread_id_orig
@@ -130,7 +136,11 @@ class Processor:
 			if len(outstream) != self.OutputSize:
 				raise ChamberRuntimeError("Returned tuple size mismatch (required %d, returned %d)" % (self.OutputSize, len(outstream)), "")
 			for i, v in enumerate(outstream):
-				self.outputvariable[i].push(v, order)
+				if not self.outputvariable[i].push(v, order):
+					self.done = True
+					with self.ackput_condition:
+						self.ackput_condition.notify_all()
+					return False
 		self.lock.acquire()
 		cnt = self.process_cnt + 1 if instream is not None and outstream is not None else self.process_cnt
 		if cnt == self.stop_at or outstream is None and instream is not None:
@@ -140,6 +150,9 @@ class Processor:
 			for ov in self.outputvariable:
 				ov.push_stop_request(cnt)
 			self.inputqueue.put((cnt, None))
+			self.done = True
+			with self.ackput_condition:
+				self.ackput_condition.notify_all()
 			return False
 		if instream is not None:
 			self.process_cnt += 1
@@ -326,9 +339,9 @@ class ScriptRunner:
 				t.start()
 				ts.append(t)
 
-		if prompt:
-			while True:
-				try:
+		try:
+			if prompt:
+				while True:
 					try:
 						statement_line = input(">>> ")
 					except EOFError:
@@ -384,10 +397,10 @@ class ScriptRunner:
 							for cmd in proc.command:
 								cmd.hook_prompt(statement, prompt_lock)
 
-				except KeyboardInterrupt:
-					print("Killing processes...")
-					self.killprocs()
-					break
+			for t in ts:
+				t.join()
 
-		for t in ts:
-			t.join()
+		except KeyboardInterrupt:
+			print("Killing processes...")
+			self.killprocs()
+
