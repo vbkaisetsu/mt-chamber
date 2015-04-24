@@ -18,7 +18,9 @@ def main():
 
 	if args.unsrt_limit < 0:
 		unsrt_limit = args.threads * 100
-	if args.unsrt_limit < args.threads:
+	else:
+		unsrt_limit = args.unsrt_limit
+	if unsrt_limit < args.threads:
 		parser.error("--unsrt-limit must be larger than --threads")
 
 	if args.FILE is None:
