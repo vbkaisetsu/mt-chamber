@@ -43,11 +43,13 @@ class DistributorVariable:
 
 	def push(self, data, order):
 		for proc, i in self.target:
-			proc.put_data(i, data, order)
+			if not proc.put_data(i, data, order):
+				return False
+		return True
 
 
 class Processor:
-	def __init__(self, commandname, argdict, insize, outsize, threads=1, Qsize=100):
+	def __init__(self, commandname, argdict, insize, outsize, threads=1, unsrt_limit=100):
 		try:
 			if hasattr(__import__("plugins", fromlist=[commandname]), commandname):
 				self.klass = getattr(__import__("plugins", fromlist=[commandname]), commandname).Command
@@ -61,11 +63,11 @@ class Processor:
 		self.outputvariable = [DistributorVariable() for i in range(outsize)]
 		self.lock = threading.Lock()
 		self.ackput_condition = threading.Condition()
-		self.working_list = set()
-		self.oldest_order = -1
 		self.seqorder = 0
-		self.Qsize = Qsize
+		self.unsrt_limit = unsrt_limit
 		self.temp_input = defaultdict(lambda : [None] * insize)
+		self.unsrt_memory = [False] * (self.unsrt_limit + 1)
+		self.unsrt_top = 0
 		self.stop_at = -1
 		self.process_cnt = 0
 		self.singlethread_order = 0
@@ -73,6 +75,7 @@ class Processor:
 		self.InputSize = insize
 		self.OutputSize = outsize
 		self.killing = False
+		self.done = False
 
 	def put_stop_request(self, order):
 		self.stop_at = order
@@ -81,8 +84,10 @@ class Processor:
 
 	def put_data(self, i, data, order):
 		with self.ackput_condition:
-			while self.oldest_order != -2 and order > self.oldest_order + self.Qsize and not self.killing:
+			while order >= self.unsrt_top + self.unsrt_limit and not self.killing:
 				self.ackput_condition.wait()
+		if self.done:
+			return False
 		if self.killing:
 			raise Killed("killing is set")
 		self.temp_input[order][i] = data
@@ -95,6 +100,7 @@ class Processor:
 					break
 				self.inputqueue.put((self.singlethread_order, self.temp_input.pop(self.singlethread_order)))
 				self.singlethread_order += 1
+		return True
 
 	def run_routine(self, thread_id_orig):
 		thread_id = thread_id_orig
@@ -109,24 +115,32 @@ class Processor:
 				order = self.seqorder
 				self.seqorder += 1
 			instream = ()
-		with self.lock:
-			self.working_list.add(order)
-			self.oldest_order = min(self.working_list)
 		try:
 			outstream = self.command[thread_id].routine(instream) if instream is not None else None
 		except Exception as e:
 			tr = traceback.format_exc()
 			raise ChamberRuntimeError("Runtime error", tr)
-		with self.lock:
-			self.working_list.discard(order)
-			self.oldest_order = min(self.working_list) if self.working_list else -2
-		with self.ackput_condition:
-			self.ackput_condition.notify_all()
+		if self.InputSize != 0:
+			with self.ackput_condition:
+				self.unsrt_memory[order - self.unsrt_top] = True
+				if False not in self.unsrt_memory:
+					unsrt_mem_shiftsize = self.unsrt_limit
+				else:
+					unsrt_mem_shiftsize = self.unsrt_memory.index(False)
+				if unsrt_mem_shiftsize != 0:
+					self.unsrt_memory[:unsrt_mem_shiftsize] = []
+					self.unsrt_memory.extend([False] * unsrt_mem_shiftsize)
+					self.unsrt_top += unsrt_mem_shiftsize
+				self.ackput_condition.notify_all()
 		if outstream is not None:
 			if len(outstream) != self.OutputSize:
 				raise ChamberRuntimeError("Returned tuple size mismatch (required %d, returned %d)" % (self.OutputSize, len(outstream)), "")
 			for i, v in enumerate(outstream):
-				self.outputvariable[i].push(v, order)
+				if not self.outputvariable[i].push(v, order):
+					self.done = True
+					with self.ackput_condition:
+						self.ackput_condition.notify_all()
+					return False
 		self.lock.acquire()
 		cnt = self.process_cnt + 1 if instream is not None and outstream is not None else self.process_cnt
 		if cnt == self.stop_at or outstream is None and instream is not None:
@@ -136,6 +150,9 @@ class Processor:
 			for ov in self.outputvariable:
 				ov.push_stop_request(cnt)
 			self.inputqueue.put((cnt, None))
+			self.done = True
+			with self.ackput_condition:
+				self.ackput_condition.notify_all()
 			return False
 		if instream is not None:
 			self.process_cnt += 1
@@ -154,7 +171,7 @@ class ScriptRunner:
 			return "\n"
 		return esc_ch
 
-	def __init__(self, lines, threads=1, buffersize=100):
+	def __init__(self, lines, threads=1, unsrt_limit=100):
 		variables = {}
 		alias = {}
 		self.procs = []
@@ -249,7 +266,7 @@ class ScriptRunner:
 			if commandthreads == -1:
 				commandthreads = self.threads
 			try:
-				proc = Processor(command, options, len(invar_name), len(outvar_name), threads=commandthreads, Qsize=buffersize)
+				proc = Processor(command, options, len(invar_name), len(outvar_name), threads=commandthreads, unsrt_limit=unsrt_limit)
 			except Exception as e:
 				tr = traceback.format_exc()
 				raise ChamberInitialError(e, n+1, tr)
@@ -322,9 +339,9 @@ class ScriptRunner:
 				t.start()
 				ts.append(t)
 
-		if prompt:
-			while True:
-				try:
+		try:
+			if prompt:
+				while True:
 					try:
 						statement_line = input(">>> ")
 					except EOFError:
@@ -380,10 +397,10 @@ class ScriptRunner:
 							for cmd in proc.command:
 								cmd.hook_prompt(statement, prompt_lock)
 
-				except KeyboardInterrupt:
-					print("Killing processes...")
-					self.killprocs()
-					break
+			for t in ts:
+				t.join()
 
-		for t in ts:
-			t.join()
+		except KeyboardInterrupt:
+			print("Killing processes...")
+			self.killprocs()
+
