@@ -402,5 +402,6 @@ class ScriptRunner:
 
 		except KeyboardInterrupt:
 			print("Killing processes...")
+			self.running.set()
 			self.killprocs()
 
