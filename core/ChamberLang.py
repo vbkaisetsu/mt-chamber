@@ -395,7 +395,7 @@ class ScriptRunner:
 					for lnum, proc, threads in self.procs:
 						if hasattr(proc.klass, "hook_prompt"):
 							for cmd in proc.command:
-								cmd.hook_prompt(statement, prompt_lock)
+								cmd.hook_prompt(statement)
 
 			for t in ts:
 				t.join()
@@ -404,4 +404,3 @@ class ScriptRunner:
 			print("Killing processes...")
 			self.running.set()
 			self.killprocs()
-
