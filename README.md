@@ -116,7 +116,7 @@ class Command:
     def routine(self, instream):
         ::::
 
-    def hook_prompt(self, statement, lock):
+    def hook_prompt(self, statement):
         ::::
 
     def kill(self):
