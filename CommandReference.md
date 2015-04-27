@@ -74,7 +74,7 @@ Barkeley socket
 
   |Field     |Name/#     |Description                              |
   |:---------|:----------|:----------------------------------------|
-  |Options   |``ipaddr`` |Listening ip addres.                     |
+  |Options   |``host``   |Host name.                               |
   |          |``port``   |Port number.                             |
   |          |``backlog``|A length of the connection queue.        |
   |Input     |None       |                                         |
