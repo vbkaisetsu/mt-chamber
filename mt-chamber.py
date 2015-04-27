@@ -2,7 +2,7 @@
 
 import sys
 
-from core.ChamberLang import ScriptRunner, ChamberInitialError
+from ChamberLang.core import ScriptRunner, ChamberInitialError
 from argparse import ArgumentParser
 
 def main():

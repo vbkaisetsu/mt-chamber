@@ -54,7 +54,7 @@ class Processor:
 			if hasattr(__import__("plugins", fromlist=[commandname]), commandname):
 				self.klass = getattr(__import__("plugins", fromlist=[commandname]), commandname).Command
 			else:
-				self.klass = getattr(__import__("core.commands", fromlist=[commandname]), commandname).Command
+				self.klass = getattr(__import__("ChamberLang.commands", fromlist=[commandname]), commandname).Command
 		except AttributeError:
 			raise Exception("Command \"%s\" is not found" % commandname)
 
@@ -65,7 +65,7 @@ class Processor:
 		self.ackput_condition = threading.Condition()
 		self.seqorder = 0
 		self.unsrt_limit = unsrt_limit
-		self.temp_input = defaultdict(lambda : [None] * insize)
+		self.temp_input = defaultdict(lambda : {})
 		self.unsrt_memory = [False] * (self.unsrt_limit + 1)
 		self.unsrt_top = 0
 		self.stop_at = -1
@@ -92,13 +92,13 @@ class Processor:
 			raise Killed("killing is set")
 		self.temp_input[order][i] = data
 		if self.klass.MultiThreadable:
-			if None not in self.temp_input[order]:
+			if len(self.temp_input[order]) == self.InputSize:
 				self.inputqueue.put((order, self.temp_input.pop(order)))
 		else:
 			while self.singlethread_order in self.temp_input:
-				if None in self.temp_input[self.singlethread_order]:
+				if len(self.temp_input[self.singlethread_order]) < self.InputSize:
 					break
-				self.inputqueue.put((self.singlethread_order, self.temp_input.pop(self.singlethread_order)))
+				self.inputqueue.put((self.singlethread_order, [x[1] for x in sorted(self.temp_input.pop(self.singlethread_order).items())]))
 				self.singlethread_order += 1
 		return True
 
