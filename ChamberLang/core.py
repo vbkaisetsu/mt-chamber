@@ -72,6 +72,9 @@ class Processor:
 		self.process_cnt = 0
 		self.singlethread_order = 0
 		self.threads = threads
+		if hasattr(self.klass, "set_threads"):
+			for cmd in self.command:
+				cmd.set_threads(threads)
 		self.InputSize = insize
 		self.OutputSize = outsize
 		self.killing = False
