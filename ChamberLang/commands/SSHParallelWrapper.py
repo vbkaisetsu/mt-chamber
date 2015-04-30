@@ -36,7 +36,7 @@ class Command:
 	re_host_threads = re.compile(r"(.+)\/(\d+)$")
 
 
-	def __init__(self, threads, basecmd, servers, ssh_user, node_exec=None, ssh_pass=None, rsa_keyfile=None, rsa_keypass=None, **kwargs):
+	def __init__(self, threads, basecmd, nodes, ssh_user, node_exec=None, ssh_pass=None, rsa_keyfile=None, rsa_keypass=None, **kwargs):
 
 		try:
 			if hasattr(__import__("plugins", fromlist=[basecmd]), basecmd):
@@ -55,14 +55,14 @@ class Command:
 		self.local_wrapper = []
 		self.local_wrapper_used = []
 
-		for server in servers.split(";"):
-			m = Command.re_host_port_threads.match(server)
+		for node in nodes.split(";"):
+			m = Command.re_host_port_threads.match(node)
 			if m:
 				host = m.group(1)
 				port = int(m.group(2))
 				node_threads = int(m.group(3))
 			else:
-				m = Command.re_host_threads.match(server)
+				m = Command.re_host_threads.match(node)
 				if not m:
 					raise Exception("Invalid server name `%s'" % server)
 				host = m.group(1)
