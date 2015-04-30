@@ -7,6 +7,7 @@ import re
 import pickle
 import threading
 import sys
+import os
 
 class Command:
 
@@ -35,7 +36,7 @@ class Command:
 	re_host_threads = re.compile(r"(.+)\/(\d+)$")
 
 
-	def __init__(self, threads, basecmd, servers, node_exec, ssh_user, ssh_pass=None, rsa_keyfile=None, rsa_keypass=None, **kwargs):
+	def __init__(self, threads, basecmd, servers, ssh_user, node_exec=None, ssh_pass=None, rsa_keyfile=None, rsa_keypass=None, **kwargs):
 
 		try:
 			if hasattr(__import__("plugins", fromlist=[basecmd]), basecmd):
@@ -83,6 +84,8 @@ class Command:
 				except paramiko.AuthenticationException:
 					ssh_pass = getpass.getpass("Password for `%s@%s': " % (ssh_user, host))
 					ssh.connect(host, username=ssh_user, password=ssh_pass, pkey=Command.RSAKeys[rsa_keyfile])
+				if not node_exec:
+					node_exec = os.path.join(os.path.dirname(__file__), "../../ssh-parallel-node.py")
 				ssh_stdin, ssh_stdout, ssh_stderr = ssh.exec_command(node_exec)
 				ssh_stdout.FLAG_BINARY = True
 				print(basecmd, file=ssh_stdin)
