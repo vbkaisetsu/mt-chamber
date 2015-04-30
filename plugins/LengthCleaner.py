@@ -3,7 +3,7 @@ class Command:
 	InputSize = 2
 	OutputSize = 2
 	MultiThreadable = True
-	ShareResources = True
+	ShareResources = False
 
 	def __init__(self, maxlen1=100, maxlen2=100, maxratio=8):
 		self.maxlen1 = maxlen1

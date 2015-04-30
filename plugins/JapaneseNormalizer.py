@@ -30,7 +30,7 @@ class Command:
 	InputSize = 1
 	OutputSize = 1
 	MultiThreadable = True
-	ShareResources = True
+	ShareResources = False
 
 	def __init__(self, psmdb=KATAKANA_PSM_DB):
 		self.kpsm = KatakanaPSM(psmdb)

@@ -54,7 +54,7 @@ class Command:
 	InputSize = 2
 	OutputSize = 2
 	MultiThreadable = True
-	ShareResources = True
+	ShareResources = False
 
 	def __init__(self):
 		self.emailrepl = EmailReplacer()
