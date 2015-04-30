@@ -124,6 +124,43 @@ Example:
     CloseSocketConnection < conn
 
 
+Distributed computing over SSH
+-------------------------------------------------------
+
+* ``SSHParallelWrapper``: Run some threads on other computers using SSH.
+
+  |Field     |Name/#         |Description                              |
+  |:---------|:--------------|:----------------------------------------|
+  |Options   |``basecmd``    |Command name to run.                     |
+  |          |``nodes``      |Semi-colon sepalated list of nodes.      |
+  |          |``ssh_user``   |User name of node computers.             |
+  |          |``ssh_pass``   |User's password. (Optional)              |
+  |          |``rsa_keyfile``|RSA secret key file. (Optional)          |
+  |          |``rsa_keypass``|Password of the specified key. (Optional)|
+  |          |``node_exec``  |Node executable path. (Optional)         |
+  |          |``(options)``  |Options of the specified command.        |
+  |Input     |*              |(Depends on ``basecmd``)                 |
+  |Output    |*              |(Depends on ``basecmd``)                 |
+
+``nodes`` is a list of computers separated by ``;``. Each item contains a host name,
+a port number, and a number of threads. (Port numbers are omitable)
+
+    hostname:port/threads
+
+If ``ssh_pass`` or ``rsa_keypass`` is not specified and the password is required,
+you will input the password in the initialization phase.
+
+Example:
+
+    Alias SSHParallelSettings nodes="node01.example.com/10;node02.example.com/10" \
+                    :ssh_user="user":rsa_keyfile="/home/user/.ssh/id_rsa"
+    Alias PKyTea basecmd="System":command="kytea -notags -wsconst D"
+    SSHParallelWrapper:SSHParallelSettings:PKyTea * 30 < raw > tok
+
+In this case, 30 threads total of ``System`` commands are run.
+However, 20 threads are run on other computers, and 10 threads are run on the local computer.
+
+
 Debug
 -------------------------------------------------------
 
