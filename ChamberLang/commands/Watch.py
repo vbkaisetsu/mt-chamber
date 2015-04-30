@@ -9,7 +9,6 @@ class Command:
 
 	OutputSize = 0
 	MultiThreadable = False
-	ShareResources = False
 
 	def __init__(self, name=None):
 		self.name = name

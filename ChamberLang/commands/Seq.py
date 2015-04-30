@@ -9,7 +9,6 @@ class Command:
 
 	OutputSize = 1
 	MultiThreadable = False
-	ShareResources = False
 
 	def __init__(self, stop=-1):
 		self.counter = 0

@@ -5,7 +5,6 @@ class Command:
 	InputSize = 1
 	OutputSize = 0
 	MultiThreadable = False
-	ShareResources = True
 
 	def __init__(self, file, buff=-1):
 		self.fp = open(file, "w", buffering=buff)
