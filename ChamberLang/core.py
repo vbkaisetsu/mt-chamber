@@ -93,7 +93,7 @@ class Processor:
 		self.temp_input[order][i] = data
 		if self.klass.MultiThreadable:
 			if len(self.temp_input[order]) == self.InputSize:
-				self.inputqueue.put((order, self.temp_input.pop(order)))
+				self.inputqueue.put((order, [x[1] for x in sorted(self.temp_input.pop(order).items())]))
 		else:
 			while self.singlethread_order in self.temp_input:
 				if len(self.temp_input[self.singlethread_order]) < self.InputSize:
