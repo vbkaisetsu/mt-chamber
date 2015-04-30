@@ -8,7 +8,7 @@ class Command:
 	MultiThreadable = True
 	ShareResources = True
 
-	def __init__(self, how):
+	def __init__(self, threads, how):
 		if "r" in how and "w" in how:
 			self.how = socket.SHUT_RDWR
 		if "r" in how:

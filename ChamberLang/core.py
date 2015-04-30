@@ -58,7 +58,12 @@ class Processor:
 		except AttributeError:
 			raise Exception("Command \"%s\" is not found" % commandname)
 
-		self.command = [self.klass(**argdict) for i in range(1 if not self.klass.MultiThreadable or self.klass.ShareResources else threads)]
+		if not self.klass.MultiThreadable:
+			self.command = [self.klass(**argdict)]
+		elif self.klass.ShareResources:
+			self.command = [self.klass(threads=threads, **argdict)]
+		else:
+			self.command = [self.klass(**argdict) for i in range(threads)]
 		self.inputqueue = queue.Queue()
 		self.outputvariable = [DistributorVariable() for i in range(outsize)]
 		self.lock = threading.Lock()
@@ -72,9 +77,6 @@ class Processor:
 		self.process_cnt = 0
 		self.singlethread_order = 0
 		self.threads = threads
-		if hasattr(self.klass, "set_threads"):
-			for cmd in self.command:
-				cmd.set_threads(threads)
 		self.InputSize = insize
 		self.OutputSize = outsize
 		self.killing = False
