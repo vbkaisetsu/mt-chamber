@@ -110,10 +110,10 @@ class Command:
     MultiThreadable = True
     ShareResources = False
 
-    def __init__(self, options...):
+    def __init__(self, [threads], options...):
         ::::
 
-    def routine(self, instream):
+    def routine(self, [thread_id], instream):
         ::::
 
     def hook_prompt(self, statement):
@@ -133,8 +133,8 @@ class Command:
 
 In ``Command`` class, you have to define at least ``routine`` function. In addition, you will define other functions.
 
-* ``__init__``: Called when an instance of ``Command`` class is created. Instances are created specified numbers by ``MultiThreadable`` and ``ShareResources``. If ``MultiThreadable`` is ``False`` or ``ShareResources`` is ``True``, it will be generated once. Otherwise, it will be generated for each thread. In ``options...``, you can define options as normal arguments.
-* ``routine``: Called when the command received data. ``instream`` is a tuple of input data, and this function will return output data as a tuple. If it returns ``None`` instead of a tuple, this command will be finished and notify it to other commands.
+* ``__init__``: Called when an instance of ``Command`` class is created. Instances are created specified numbers by ``MultiThreadable`` and ``ShareResources``. If ``MultiThreadable`` is ``False`` or ``ShareResources`` is ``True``, it will be generated once. Otherwise, it will be generated for each thread. In ``options...``, you can define options as normal arguments. If ``MultiThreadable`` is ``True`` and ``ShareResources`` is ``True``, this function takes ``threads`` argument that contains the number of threads. Otherwise, it does not take that.
+* ``routine``: Called when the command received data. ``instream`` is a tuple of input data, and this function will return output data as a tuple. If it returns ``None`` instead of a tuple, this command will be finished and notify it to other commands. If ``MultiThreadable`` is ``True`` and ``ShareResources`` is ``True``, this function takes ``thread_id`` argument. Otherwise, it does not take that.
 * ``hook_prompt``: Called when a command is input in the prompt mode. ``statement`` is a list of a command and arguments.
 * ``kill``: Called when ``kill`` command is input in the prompt mode.
 * ``__del__``: Called when the script is finished and an instance is discarded.
