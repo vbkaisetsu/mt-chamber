@@ -45,15 +45,12 @@ class Command:
 				self.klass = getattr(__import__("ChamberLang.commands", fromlist=[basecmd]), basecmd).Command
 		except AttributeError:
 			raise Exception("Command \"%s\" is not found" % basecmd)
-
 		if not self.klass.MultiThreadable or self.klass.ShareResources:
 			raise Exception("Command \"%s\" is not callable by GridWrapper (required: MultiThreadable=True, ShareResources=False)" % commandname)
 
 		self.lock = threading.Lock()
 		self.ssh_wrappers = []
-		self.ssh_wrapper_used = []
 		self.local_wrapper = []
-		self.local_wrapper_used = []
 
 		for node in nodes.split(";"):
 			m = Command.re_host_port_threads.match(node)
@@ -94,25 +91,15 @@ class Command:
 				ssh_stdin.write(p_cmd_args)
 				ssh_stdin.flush()
 				self.ssh_wrappers.append((ssh, ssh_stdin, ssh_stdout, ssh_stderr))
-				self.ssh_wrapper_used.append(False)
 
 		self.local_wrapper = [self.klass(**kwargs) for i in range(threads - len(self.ssh_wrappers))]
-		self.local_wrapper_used = [False] * len(self.local_wrapper)
 
 
-	def routine(self, instream):
-		ssh_tid = -1
-		with self.lock:
-			if False in self.ssh_wrapper_used:
-				ssh_tid = self.ssh_wrapper_used.index(False)
-				self.ssh_wrapper_used[ssh_tid] = True
-			else:
-				tid = self.local_wrapper_used.index(False)
-				self.local_wrapper_used[tid] = True
-		if ssh_tid != -1:
-			ssh_stdin = self.ssh_wrappers[ssh_tid][1]
-			ssh_stdout = self.ssh_wrappers[ssh_tid][2]
-			ssh_stderr = self.ssh_wrappers[ssh_tid][3]
+	def routine(self, thread_id, instream):
+		if thread_id < len(self.ssh_wrappers):
+			ssh_stdin = self.ssh_wrappers[thread_id][1]
+			ssh_stdout = self.ssh_wrappers[thread_id][2]
+			ssh_stderr = self.ssh_wrappers[thread_id][3]
 
 			p_instream = pickle.dumps(instream)
 			print(len(p_instream), file=ssh_stdin)
@@ -122,10 +109,9 @@ class Command:
 			p_outstream = ssh_stdout.read(int(datasize))
 			outstream = pickle.loads(p_outstream)
 
-			self.ssh_wrapper_used[ssh_tid] = False
 		else:
+			tid = thread_id - len(self.ssh_wrappers)
 			outstream = self.local_wrapper[tid].routine(instream)
-			self.local_wrapper_used[tid] = False
 
 		return outstream
 

@@ -19,7 +19,7 @@ class Command:
 			raise Exception("Option \"how\" should have \"r\", \"w\" or both characters")
 
 
-	def routine(self, instream):
+	def routine(self, thread_id, instream):
 		conn = instream[0]
 		conn.shutdown(self.how)
 		return ()

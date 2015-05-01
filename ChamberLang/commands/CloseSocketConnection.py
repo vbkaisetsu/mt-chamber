@@ -8,7 +8,7 @@ class Command:
 	def __init__(self, threads):
 		pass
 
-	def routine(self, instream):
+	def routine(self, thread_id, instream):
 		conn = instream[0]
 		conn.close()
 		return ()

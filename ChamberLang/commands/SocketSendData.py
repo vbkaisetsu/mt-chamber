@@ -8,7 +8,7 @@ class Command:
 	def __init__(self, threads, encode=None):
 		self.encode = encode
 
-	def routine(self, instream):
+	def routine(self, thread_id, instream):
 		conn = instream[0]
 		data = instream[1]
 		if self.encode:

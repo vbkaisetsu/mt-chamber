@@ -9,7 +9,7 @@ class Command:
 		self.size = int(size)
 		self.decode = decode
 
-	def routine(self, instream):
+	def routine(self, thread_id, instream):
 		conn = instream[0]
 		data = conn.recv(self.size)
 		if self.decode:

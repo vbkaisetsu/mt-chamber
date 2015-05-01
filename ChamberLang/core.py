@@ -121,7 +121,10 @@ class Processor:
 				self.seqorder += 1
 			instream = ()
 		try:
-			outstream = self.command[thread_id].routine(instream) if instream is not None else None
+			if self.klass.MultiThreadable and self.klass.ShareResources:
+				outstream = self.command[0].routine(thread_id_orig, instream) if instream is not None else None
+			else:
+				outstream = self.command[thread_id].routine(instream) if instream is not None else None
 		except Exception as e:
 			tr = traceback.format_exc()
 			raise ChamberRuntimeError("Runtime error", tr)
