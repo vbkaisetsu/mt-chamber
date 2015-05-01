@@ -13,6 +13,10 @@ class Killed(Exception):
 	pass
 
 
+class MessageException(Exception):
+	pass
+
+
 class ChamberInitialError(Exception):
 	def __init__(self, value, linenumber, trace=None):
 		self.value = value
@@ -286,6 +290,8 @@ class ScriptRunner:
 				commandthreads = self.threads
 			try:
 				proc = Processor(command, options, len(invar_name), len(outvar_name), threads=commandthreads, unsrt_limit=unsrt_limit)
+			except MessageException as e:
+				raise ChamberInitialError(e, n+1)
 			except Exception as e:
 				tr = traceback.format_exc()
 				raise ChamberInitialError(e, n+1, tr)

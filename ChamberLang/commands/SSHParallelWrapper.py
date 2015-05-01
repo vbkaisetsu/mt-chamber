@@ -9,9 +9,25 @@ import threading
 import sys
 import os
 
+from ChamberLang.core import MessageException
+
+
+def GetDecriptedKey(filename, password):
+	supported_keys = [paramiko.DSSKey, paramiko.ECDSAKey, paramiko.RSAKey]
+	saved_exception = None
+	for loader in supported_keys:
+		try:
+			key = loader.from_private_key_file(filename, password=password)
+		except paramiko.SSHException as e:
+			saved_exception = e
+			continue
+		return key
+	raise saved_exception
+
+
 class Command:
 
-	RSAKeys = {None: None}
+	KeyData = {None: None}
 
 	def InputSize(self, size):
 		if callable(self.klass.InputSize):
@@ -36,7 +52,7 @@ class Command:
 	re_host_threads = re.compile(r"(.+)\/(\d+)$")
 
 
-	def __init__(self, threads, basecmd, nodes, ssh_user, node_exec=None, ssh_pass=None, rsa_keyfile=None, rsa_keypass=None, **kwargs):
+	def __init__(self, threads, basecmd, nodes, ssh_user, node_exec=None, ssh_pass=None, keyfile=None, keypass=None, **kwargs):
 
 		try:
 			if hasattr(__import__("plugins", fromlist=[basecmd]), basecmd):
@@ -68,19 +84,22 @@ class Command:
 
 			for i in range(node_threads):
 				try:
-					if rsa_keyfile and rsa_keyfile not in Command.RSAKeys:
-						Command.RSAKeys[rsa_keyfile] = paramiko.RSAKey.from_private_key_file(rsa_keyfile, password=rsa_keypass)
+					if keyfile and keyfile not in Command.KeyData:
+						Command.KeyData[keyfile] = GetDecriptedKey(keyfile, password=keypass)
 				except (paramiko.PasswordRequiredException, paramiko.SSHException):
-					rsa_keypass = getpass.getpass("Password for `%s': " % rsa_keyfile)
-					Command.RSAKeys[rsa_keyfile] = paramiko.RSAKey.from_private_key_file(rsa_keyfile, password=rsa_keypass)
+					keypass = getpass.getpass("Password for `%s': " % keyfile)
+					try:
+						Command.KeyData[keyfile] = GetDecriptedKey(keyfile, password=keypass)
+					except:
+						raise MessageException("Key type or password is wrong (supported: DSA, ECDSA, and RSA)")
 
 				ssh = paramiko.SSHClient()
 				ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 				try:
-					ssh.connect(host, username=ssh_user, password=ssh_pass, pkey=Command.RSAKeys[rsa_keyfile])
+					ssh.connect(host, username=ssh_user, password=ssh_pass, pkey=Command.KeyData[keyfile])
 				except paramiko.AuthenticationException:
 					ssh_pass = getpass.getpass("Password for `%s@%s': " % (ssh_user, host))
-					ssh.connect(host, username=ssh_user, password=ssh_pass, pkey=Command.RSAKeys[rsa_keyfile])
+					ssh.connect(host, username=ssh_user, password=ssh_pass, pkey=Command.KeyData[keyfile])
 				if not node_exec:
 					node_exec = os.path.join(os.path.dirname(__file__), "../../ssh-parallel-node.py")
 				ssh_stdin, ssh_stdout, ssh_stderr = ssh.exec_command(node_exec)
