@@ -142,10 +142,11 @@ Distributed computing over SSH
   |Input     |*              |(Depends on ``basecmd``)                 |
   |Output    |*              |(Depends on ``basecmd``)                 |
 
-``nodes`` is a list of computers separated by ``;``. Each item contains a host name,
-a port number, and a number of threads. (Port numbers are omitable)
+``nodes`` is a list of computers separated by ``;``. Each item is formatted as follows:
 
     hostname:port/threads
+
+where ``port`` is omittable.
 
 If ``ssh_pass`` or ``rsa_keypass`` is not specified and the password is required,
 you will input the password in the initialization phase.
