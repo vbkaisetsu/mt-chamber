@@ -64,6 +64,17 @@ class Processor:
 			self.command = [self.klass(threads=threads, **argdict)]
 		else:
 			self.command = [self.klass(**argdict) for i in range(threads)]
+
+		if callable(self.klass.InputSize):
+			self.command[0].InputSize(insize)
+		elif insize != self.klass.InputSize:
+			raise Exception("Input size mismatch (required %d, given %d)" % (self.klass.InputSize, insize))
+
+		if callable(self.klass.OutputSize):
+			self.command[0].OutputSize(outsize)
+		elif outsize != self.klass.OutputSize:
+			raise Exception("Output size mismatch (required %d, given %d)" % (self.klass.OutputSize, outsize))
+
 		self.inputqueue = queue.Queue()
 		self.outputvariable = [DistributorVariable() for i in range(outsize)]
 		self.lock = threading.Lock()
@@ -278,24 +289,6 @@ class ScriptRunner:
 			except Exception as e:
 				tr = traceback.format_exc()
 				raise ChamberInitialError(e, n+1, tr)
-
-			if callable(proc.klass.InputSize):
-				try:
-					proc.command[0].InputSize(len(invar_name))
-				except Exception as e:
-					tr = traceback.format_exc()
-					raise ChamberInitialError(e, n+1, tr)
-			elif len(invar_name) != proc.klass.InputSize:
-				raise ChamberInitialError("Input size mismatch (required %d, given %d)" % (proc.klass.InputSize, len(invar_name)), n+1)
-
-			if callable(proc.klass.OutputSize):
-				try:
-					proc.command[0].OutputSize(len(outvar_name))
-				except:
-					tr = traceback.format_exc()
-					raise ChamberInitialError(e, n+1, tr)
-			elif len(outvar_name) != proc.klass.OutputSize:
-				raise ChamberInitialError("Output size mismatch (required %d, given %d)" % (proc.klass.OutputSize, len(outvar_name)), n+1)
 
 			for i, varname in enumerate(invar_name):
 				if varname not in variables:
