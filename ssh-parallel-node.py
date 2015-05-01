@@ -2,6 +2,7 @@
 
 import sys
 import pickle
+import traceback
 
 
 def main():
@@ -25,14 +26,24 @@ def main():
 		datasize = sys.stdin.buffer.readline()
 		p_instream = sys.stdin.buffer.read(int(datasize))
 		instream = pickle.loads(p_instream)
-		outstream = command.routine(instream)
-		p_outstream = pickle.dumps(outstream)
-		print(len(p_outstream), file=sys.stdout)
-		sys.stdout.flush()
-		sys.stdout.buffer.write(p_outstream)
-		sys.stdout.flush()
-		if outstream is None:
+		outdata = {}
+		try:
+			outstream = command.routine(instream)
+			outdata["status"] = "success"
+			outdata["data"] = outstream
+			if outstream is None:
+				break
+		except Exception:
+			tr = traceback.format_exc()
+			outdata["status"] = "failed"
+			outdata["data"] = tr
 			break
+		finally:
+			p_outdata = pickle.dumps(outdata)
+			print(len(p_outdata), file=sys.stdout)
+			sys.stdout.flush()
+			sys.stdout.buffer.write(p_outdata)
+			sys.stdout.flush()
 
 
 if __name__ == "__main__":

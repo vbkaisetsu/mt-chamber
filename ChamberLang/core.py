@@ -140,6 +140,8 @@ class Processor:
 				outstream = self.command[0].routine(thread_id_orig, instream) if instream is not None else None
 			else:
 				outstream = self.command[thread_id].routine(instream) if instream is not None else None
+		except ChamberRuntimeError:
+			raise
 		except Exception as e:
 			tr = traceback.format_exc()
 			raise ChamberRuntimeError("Runtime error", tr)
@@ -332,9 +334,8 @@ class ScriptRunner:
 			except ChamberRuntimeError as e:
 				self.killprocs()
 				with prompt_lock:
-					print("Runtime error at line %d:" % lnum, file=sys.stderr)
-					if hasattr(e.value, "errno") and e.value.errno == errno.EPIPE:
-						print("System command has been died", file=sys.stderr)
+					print("At line %d:" % lnum, file=sys.stderr)
+					print(e.value, file=sys.stderr)
 					print(e.trace, file=sys.stderr)
 
 		ts = []

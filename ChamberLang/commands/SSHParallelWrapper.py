@@ -9,7 +9,7 @@ import threading
 import sys
 import os
 
-from ChamberLang.core import MessageException
+from ChamberLang.core import MessageException, ChamberRuntimeError
 
 
 def GetDecriptedKey(filename, password):
@@ -109,7 +109,7 @@ class Command:
 				print(len(p_cmd_args), file=ssh_stdin)
 				ssh_stdin.write(p_cmd_args)
 				ssh_stdin.flush()
-				self.ssh_wrappers.append((ssh, ssh_stdin, ssh_stdout, ssh_stderr))
+				self.ssh_wrappers.append((ssh, ssh_stdin, ssh_stdout, ssh_stderr, host))
 
 		self.local_wrapper = [self.klass(**kwargs) for i in range(threads - len(self.ssh_wrappers))]
 
@@ -119,14 +119,18 @@ class Command:
 			ssh_stdin = self.ssh_wrappers[thread_id][1]
 			ssh_stdout = self.ssh_wrappers[thread_id][2]
 			ssh_stderr = self.ssh_wrappers[thread_id][3]
+			hostname = self.ssh_wrappers[thread_id][4]
 
 			p_instream = pickle.dumps(instream)
 			print(len(p_instream), file=ssh_stdin)
 			ssh_stdin.write(p_instream)
 			ssh_stdin.flush()
 			datasize = ssh_stdout.readline()
-			p_outstream = ssh_stdout.read(int(datasize))
-			outstream = pickle.loads(p_outstream)
+			p_outdata = ssh_stdout.read(int(datasize))
+			outdata = pickle.loads(p_outdata)
+			if outdata["status"] == "failed":
+				raise ChamberRuntimeError("Runtime error in `%s'" % hostname, outdata["data"])
+			outstream = outdata["data"]
 
 		else:
 			tid = thread_id - len(self.ssh_wrappers)
