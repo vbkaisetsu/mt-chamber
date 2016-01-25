@@ -122,7 +122,7 @@ BSDソケット
 
 誤ったスクリプト:
 
-    ListeningSocket:ipaddr="localhost":port=1234:backlog=5 > conn
+    ListeningSocket:host="localhost":port=1234:backlog=5 > conn
     SocketReceiveData:size=65536:decode="utf-8" < conn > data
     CloseSocketConnection < conn
     
@@ -133,7 +133,7 @@ BSDソケット
 
 正しく動作するスクリプト:
 
-    ListeningSocket:ipaddr="localhost":port=1234:backlog=5 > conn
+    ListeningSocket:host="localhost":port=1234:backlog=5 > conn
     SocketReceiveData:size=65536:decode="utf-8" < conn > conn2 data
     CloseSocketConnection < conn2
 
@@ -142,13 +142,13 @@ BSDソケット
 
 正しく動作する簡潔なスクリプト:
 
-    ListeningSocket:ipaddr="localhost":port=1234:backlog=5 > conn
+    ListeningSocket:host="localhost":port=1234:backlog=5 > conn
     SocketReceiveData:size=65536:decode="utf-8" < conn > conn data
     CloseSocketConnection < conn
 
 受信内容を処理して送信する例:
 
-    ListeningSocket:ipaddr="localhost":port=1234:backlog=5 > conn
+    ListeningSocket:host="localhost":port=1234:backlog=5 > conn
     SocketReceiveData:size=65536:decode="utf-8" < conn > conn data
     MyCommand < data > result
     SocketSendData:encode="utf-8" < conn result > conn

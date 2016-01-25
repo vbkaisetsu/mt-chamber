@@ -117,7 +117,7 @@ Barkeley socket
 
 Example:
 
-    ListeningSocket:ipaddr="localhost":port=1234:backlog=5 > conn
+    ListeningSocket:host="localhost":port=1234:backlog=5 > conn
     SocketReceiveData:size=65536:decode="utf-8" < conn > conn data
     MyCommand < data > result
     SocketSendData:encode="utf-8" < conn result > conn
