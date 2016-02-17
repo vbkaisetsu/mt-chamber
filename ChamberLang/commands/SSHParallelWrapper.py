@@ -62,7 +62,7 @@ class Command:
 		except AttributeError:
 			raise Exception("Command \"%s\" is not found" % basecmd)
 		if not self.klass.MultiThreadable or self.klass.ShareResources:
-			raise Exception("Command \"%s\" is not callable by GridWrapper (required: MultiThreadable=True, ShareResources=False)" % commandname)
+			raise Exception("Command \"%s\" is not callable by SSHParallelWrapper (required: MultiThreadable=True, ShareResources=False)" % commandname)
 
 		self.lock = threading.Lock()
 		self.ssh_wrappers = []
