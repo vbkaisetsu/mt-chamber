@@ -8,9 +8,9 @@ class Command:
     MultiThreadable = True
     ShareResources = False
 
-    def __init__(self, bin, config):
+    def __init__(self, bin, config, showerr=False):
         self.travatar = subprocess.Popen([bin, "-config_file", config, "-trace_out", "/dev/stdout", "-in_format", "egret", "-buffer", "false"],
-            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=None if showerr else subprocess.PIPE, universal_newlines=True)
 
     def routine(self, instream):
         egret_tree = instream[0]

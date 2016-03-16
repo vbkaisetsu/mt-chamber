@@ -10,9 +10,9 @@ class Command:
     MultiThreadable = True
     ShareResources = False
 
-    def __init__(self, bin, grammer):
+    def __init__(self, bin, grammer, showerr=False):
         self.egret = subprocess.Popen([bin, "-lapcfg", "-i=/dev/stdin", "-data=%s" % grammer, "-n=500", "-printForest"],
-            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=None if showerr else subprocess.PIPE, universal_newlines=True)
 
     def routine(self, instream):
         token = instream[0]
