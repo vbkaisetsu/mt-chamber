@@ -1,4 +1,5 @@
 import subprocess
+import re
 
 
 class Command:
@@ -9,8 +10,10 @@ class Command:
     ShareResources = False
 
     def __init__(self, bin, config, showerr=False):
-        self.travatar = subprocess.Popen([bin, "-config_file", config, "-trace_out", "/dev/stdout", "-in_format", "egret", "-buffer", "false"],
+        self.travatar = subprocess.Popen([bin, "-config_file", config, "-trace_out", "STDOUT", "-in_format", "egret", "-buffer", "false"],
             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=None if showerr else subprocess.PIPE, universal_newlines=True)
+
+        self.span_reg = re.compile(r"\[([0-9]+), ([0-9]+)\]")
 
     def routine(self, instream):
         egret_tree = instream[0]
@@ -21,19 +24,24 @@ class Command:
         self.travatar.stdin.write(egret_tree)
         self.travatar.stdin.flush()
 
-        travatar_trace = ""
-        travatar_output = self.travatar.stdout.readline().rstrip("\n")
-        translation_words = travatar_output.split(" ")
+        travatar_trace = self.travatar.stdout.readline()
+        spltrace = travatar_trace.split(" ||| ")
+        m = self.span_reg.match(spltrace[1])
+
+        inputlen = int(m.group(2))
+
         while True:
             travatar_trace_line = self.travatar.stdout.readline()
             spltrace = travatar_trace_line.split(" ||| ")
-            trace_words = spltrace[3].split(" ")
-            for w in trace_words:
-                if w and w[0] == w[-1] == "\"":
-                    translation_words.remove(w[1:-1])
+            spltree = spltrace[2].split(" ")
+            for x in spltree:
+                if x and x[0] == x[-1] == "\"":
+                    inputlen -= 1
             spltrace[4] = ".\n"
             travatar_trace += " ||| ".join(spltrace)
-            if not translation_words:
+            if not inputlen:
                 break
+        
+        travatar_output = self.travatar.stdout.readline().rstrip("\n")
 
         return ("success\n" + travatar_output + "\n" + travatar_trace, travatar_output,)
